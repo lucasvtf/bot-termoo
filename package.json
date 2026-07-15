@@ -1,0 +1,23 @@
+{
+  "name": "termo-bot",
+  "version": "0.1.0",
+  "description": "Bot de Discord pra jogar Termo (Wordle em português) com palavra do dia e ranking.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "db:migrate": "node src/db/migrate.js",
+    "test": "node --test src/services/termoEngine.test.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.2",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.1"
+  }
+}
