@@ -35,6 +35,8 @@ function calcularStreaks(partidasOrdenadasDesc) {
 }
 
 export async function execute(interaction) {
+  await interaction.deferReply();
+
   const { rows } = await pool.query(
     `SELECT tp.usuario_id, u.username, td.data::text AS data, tp.venceu, tp.num_tentativas
        FROM termo_partidas tp
@@ -45,7 +47,7 @@ export async function execute(interaction) {
   );
 
   if (rows.length === 0) {
-    return interaction.reply({ content: 'Ninguém jogou o Termo ainda.', ephemeral: true });
+    return interaction.editReply({ content: 'Ninguém jogou o Termo ainda.' });
   }
 
   const porUsuario = new Map();
@@ -75,5 +77,5 @@ export async function execute(interaction) {
   const buffer = renderRankingImagem(stats.slice(0, TOP_N));
   const anexo = new AttachmentBuilder(buffer, { name: 'termo-ranking.png' });
 
-  await interaction.reply({ files: [anexo] });
+  await interaction.editReply({ files: [anexo] });
 }
