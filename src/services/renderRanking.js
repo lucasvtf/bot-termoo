@@ -33,6 +33,13 @@ function truncar(ctx, texto, larguraMax) {
   return `${t}…`;
 }
 
+function mesmasPontuacoes(a, b) {
+  return a.streakAcertos === b.streakAcertos
+      && a.vitorias === b.vitorias
+      && a.streakJogos === b.streakJogos
+      && a.mediaTentativas === b.mediaTentativas;
+}
+
 export function renderRankingImagem(stats) {
   const altura = ALTURA_TITULO + ALTURA_CABECALHO + stats.length * ALTURA_LINHA + PAD;
   const canvas = createCanvas(LARGURA, altura);
@@ -56,7 +63,13 @@ export function renderRankingImagem(stats) {
   ctx.fillText('vitórias', COL_VITORIAS, yCabecalho);
   ctx.fillText('média', COL_MEDIA, yCabecalho);
 
+  const posicoes = stats.map((_, i) => i + 1);
+  for (let i = 1; i < stats.length; i++) {
+    if (mesmasPontuacoes(stats[i], stats[i - 1])) posicoes[i] = posicoes[i - 1];
+  }
+
   stats.forEach((s, i) => {
+    const posicao = posicoes[i];
     const y = ALTURA_TITULO + ALTURA_CABECALHO + i * ALTURA_LINHA;
     const cy = y + ALTURA_LINHA / 2;
 
@@ -68,12 +81,12 @@ export function renderRankingImagem(stats) {
     const cx = PAD + RAIO_BADGE;
     ctx.beginPath();
     ctx.arc(cx, cy, RAIO_BADGE, 0, Math.PI * 2);
-    ctx.fillStyle = CORES_MEDALHA[i] ?? COR_BADGE_PADRAO;
+    ctx.fillStyle = CORES_MEDALHA[posicao - 1] ?? COR_BADGE_PADRAO;
     ctx.fill();
-    ctx.fillStyle = i < 3 ? '#121213' : COR_TEXTO;
+    ctx.fillStyle = posicao <= 3 ? '#121213' : COR_TEXTO;
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText(String(i + 1), cx, cy + 1);
+    ctx.fillText(String(posicao), cx, cy + 1);
 
     const nomeX = PAD + RAIO_BADGE * 2 + 14;
     const nomeMaxLargura = COL_STREAK - 70 - nomeX;
