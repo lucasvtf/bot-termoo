@@ -65,7 +65,12 @@ export async function execute(interaction) {
     return { usuarioId, username, vitorias, jogadas, mediaTentativas, streakAcertos, streakJogos };
   });
 
-  stats.sort((a, b) => b.streakAcertos - a.streakAcertos || b.vitorias - a.vitorias || b.streakJogos - a.streakJogos);
+  stats.sort((a, b) =>
+    b.streakAcertos - a.streakAcertos
+    || b.vitorias - a.vitorias
+    || b.streakJogos - a.streakJogos
+    || (a.mediaTentativas ?? Infinity) - (b.mediaTentativas ?? Infinity),
+  );
 
   const buffer = renderRankingImagem(stats.slice(0, TOP_N));
   const anexo = new AttachmentBuilder(buffer, { name: 'termo-ranking.png' });
