@@ -73,12 +73,20 @@ export async function execute(interaction) {
     || b.streakJogos - a.streakJogos,
   );
 
-  const recordista = stats.reduce((melhor, s) => (s.streakAcertos > (melhor?.streakAcertos ?? 0) ? s : melhor), null);
-  const destaqueStreak = recordista && recordista.streakAcertos > 0
-    ? { username: recordista.username, valor: recordista.streakAcertos }
+  const melhorPor = (campo) =>
+    stats.reduce((melhor, s) => (s[campo] > (melhor?.[campo] ?? 0) ? s : melhor), null);
+
+  const recordistaStreak = melhorPor('streakAcertos');
+  const destaqueStreak = recordistaStreak && recordistaStreak.streakAcertos > 0
+    ? { username: recordistaStreak.username, valor: recordistaStreak.streakAcertos }
     : null;
 
-  const buffer = renderRankingImagem(stats.slice(0, TOP_N), { destaqueStreak });
+  const recordistaDias = melhorPor('streakJogos');
+  const destaqueDias = recordistaDias && recordistaDias.streakJogos > 0
+    ? { username: recordistaDias.username, valor: recordistaDias.streakJogos }
+    : null;
+
+  const buffer = renderRankingImagem(stats.slice(0, TOP_N), { destaqueStreak, destaqueDias });
   const anexo = new AttachmentBuilder(buffer, { name: 'termo-ranking.png' });
 
   await interaction.editReply({ files: [anexo] });

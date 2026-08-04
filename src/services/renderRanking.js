@@ -14,7 +14,9 @@ const COR_LINHA_ALT = '#1c1c1e';
 const COR_TEXTO = '#ffffff';
 const COR_TEXTO_MUTED = '#818384';
 const COR_TEXTO_MUTED_2 = '#5c5c5e';
-const COR_BANNER_FUNDO = '#1a2a1c';
+const COR_BANNER_FUNDO_VERDE = '#1a2a1c';
+const COR_AZUL = '#4a90d9';
+const COR_BANNER_FUNDO_AZUL = '#16232f';
 const CORES_MEDALHA = ['#d4af37', '#c0c0c0', '#cd7f32'];
 const COR_BADGE_PADRAO = '#3a3a3c';
 
@@ -40,8 +42,49 @@ function mesmasPontuacoes(a, b) {
   return a.vitorias === b.vitorias && a.mediaTentativas === b.mediaTentativas;
 }
 
-export function renderRankingImagem(stats, { destaqueStreak = null } = {}) {
-  const alturaBanner = destaqueStreak ? ALTURA_BANNER : 0;
+function desenharBanner(ctx, y, { cor, corFundo, rotulo, nome, sufixo }) {
+  ctx.fillStyle = corFundo;
+  ctx.fillRect(0, y, LARGURA, ALTURA_BANNER);
+  ctx.fillStyle = cor;
+  ctx.fillRect(0, y, 4, ALTURA_BANNER);
+
+  const cy = y + ALTURA_BANNER / 2;
+  ctx.textAlign = 'left';
+  ctx.font = '600 14px Arial';
+  ctx.fillStyle = COR_TEXTO_MUTED;
+  const rotuloComEspaco = `${rotulo}  `;
+  ctx.fillText(rotuloComEspaco, PAD, cy + 1);
+  const larguraRotulo = ctx.measureText(rotuloComEspaco).width;
+
+  ctx.font = 'bold 14px Arial';
+  ctx.fillStyle = COR_TEXTO;
+  ctx.fillText(nome, PAD + larguraRotulo, cy + 1);
+  const larguraNome = ctx.measureText(nome).width;
+
+  ctx.font = '600 14px Arial';
+  ctx.fillStyle = cor;
+  ctx.fillText(` — ${sufixo}`, PAD + larguraRotulo + larguraNome, cy + 1);
+}
+
+export function renderRankingImagem(stats, { destaqueStreak = null, destaqueDias = null } = {}) {
+  const banners = [
+    destaqueStreak && {
+      cor: CORES.verde,
+      corFundo: COR_BANNER_FUNDO_VERDE,
+      rotulo: 'Maior streak atual',
+      nome: destaqueStreak.username,
+      sufixo: `${destaqueStreak.valor} dias seguidos`,
+    },
+    destaqueDias && {
+      cor: COR_AZUL,
+      corFundo: COR_BANNER_FUNDO_AZUL,
+      rotulo: 'Mais dias seguidos jogando',
+      nome: destaqueDias.username,
+      sufixo: `${destaqueDias.valor} dias`,
+    },
+  ].filter(Boolean);
+
+  const alturaBanner = banners.length * ALTURA_BANNER;
   const altura = ALTURA_TITULO + alturaBanner + ALTURA_CABECALHO + stats.length * ALTURA_LINHA + PAD;
   const canvas = createCanvas(LARGURA, altura);
   const ctx = canvas.getContext('2d');
@@ -55,31 +98,9 @@ export function renderRankingImagem(stats, { destaqueStreak = null } = {}) {
   ctx.textBaseline = 'middle';
   ctx.fillText('Ranking do Termo', PAD, ALTURA_TITULO / 2 + 4);
 
-  if (destaqueStreak) {
-    const yBanner = ALTURA_TITULO;
-    ctx.fillStyle = COR_BANNER_FUNDO;
-    ctx.fillRect(0, yBanner, LARGURA, ALTURA_BANNER);
-    ctx.fillStyle = CORES.verde;
-    ctx.fillRect(0, yBanner, 4, ALTURA_BANNER);
-
-    const cyBanner = yBanner + ALTURA_BANNER / 2;
-    ctx.textAlign = 'left';
-    ctx.font = '600 14px Arial';
-    ctx.fillStyle = COR_TEXTO_MUTED;
-    const rotulo = 'Maior streak atual  ';
-    ctx.fillText(rotulo, PAD, cyBanner + 1);
-    const larguraRotulo = ctx.measureText(rotulo).width;
-
-    ctx.font = 'bold 14px Arial';
-    ctx.fillStyle = COR_TEXTO;
-    const nome = `${destaqueStreak.username}`;
-    ctx.fillText(nome, PAD + larguraRotulo, cyBanner + 1);
-    const larguraNome = ctx.measureText(nome).width;
-
-    ctx.font = '600 14px Arial';
-    ctx.fillStyle = CORES.verde;
-    ctx.fillText(` — ${destaqueStreak.valor} dias seguidos`, PAD + larguraRotulo + larguraNome, cyBanner + 1);
-  }
+  banners.forEach((banner, i) => {
+    desenharBanner(ctx, ALTURA_TITULO + i * ALTURA_BANNER, banner);
+  });
 
   const yCabecalho0 = ALTURA_TITULO + alturaBanner;
   ctx.fillStyle = COR_TEXTO_MUTED;
