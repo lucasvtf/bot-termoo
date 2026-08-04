@@ -132,7 +132,7 @@ export function renderRankingImagem(stats, { destaqueStreak = null } = {}) {
 
     ctx.font = 'bold 16px Arial';
     ctx.fillStyle = COR_TEXTO;
-    ctx.fillText(s.mediaTentativas !== null ? s.mediaTentativas.toFixed(1) : '—', COL_MEDIA, cy + 1);
+    ctx.fillText(s.mediaTentativas !== null ? s.mediaTentativas.toFixed(2) : '—', COL_MEDIA, cy + 1);
 
     // streak e dias são "conquistas": menor destaque, não influenciam a posição
     ctx.font = '13px Arial';
