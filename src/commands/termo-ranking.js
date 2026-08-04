@@ -73,18 +73,21 @@ export async function execute(interaction) {
     || b.streakJogos - a.streakJogos,
   );
 
-  const melhorPor = (campo) =>
-    stats.reduce((melhor, s) => (s[campo] > (melhor?.[campo] ?? 0) ? s : melhor), null);
+  const formatarNomes = (nomes) => {
+    if (nomes.length === 1) return nomes[0];
+    if (nomes.length <= 3) return `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`;
+    return `${nomes.slice(0, 2).join(', ')} e mais ${nomes.length - 2}`;
+  };
 
-  const recordistaStreak = melhorPor('streakAcertos');
-  const destaqueStreak = recordistaStreak && recordistaStreak.streakAcertos > 0
-    ? { username: recordistaStreak.username, valor: recordistaStreak.streakAcertos }
-    : null;
+  const destaquePor = (campo) => {
+    const valor = Math.max(...stats.map((s) => s[campo]));
+    if (valor <= 0) return null;
+    const nomes = stats.filter((s) => s[campo] === valor).map((s) => s.username);
+    return { username: formatarNomes(nomes), valor };
+  };
 
-  const recordistaDias = melhorPor('streakJogos');
-  const destaqueDias = recordistaDias && recordistaDias.streakJogos > 0
-    ? { username: recordistaDias.username, valor: recordistaDias.streakJogos }
-    : null;
+  const destaqueStreak = destaquePor('streakAcertos');
+  const destaqueDias = destaquePor('streakJogos');
 
   const buffer = renderRankingImagem(stats.slice(0, TOP_N), { destaqueStreak, destaqueDias });
   const anexo = new AttachmentBuilder(buffer, { name: 'termo-ranking.png' });
