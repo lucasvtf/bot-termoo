@@ -68,13 +68,17 @@ export async function execute(interaction) {
   });
 
   stats.sort((a, b) =>
-    b.streakAcertos - a.streakAcertos
-    || b.vitorias - a.vitorias
-    || b.streakJogos - a.streakJogos
-    || (a.mediaTentativas ?? Infinity) - (b.mediaTentativas ?? Infinity),
+    b.vitorias - a.vitorias
+    || (a.mediaTentativas ?? Infinity) - (b.mediaTentativas ?? Infinity)
+    || b.streakJogos - a.streakJogos,
   );
 
-  const buffer = renderRankingImagem(stats.slice(0, TOP_N));
+  const recordista = stats.reduce((melhor, s) => (s.streakAcertos > (melhor?.streakAcertos ?? 0) ? s : melhor), null);
+  const destaqueStreak = recordista && recordista.streakAcertos > 0
+    ? { username: recordista.username, valor: recordista.streakAcertos }
+    : null;
+
+  const buffer = renderRankingImagem(stats.slice(0, TOP_N), { destaqueStreak });
   const anexo = new AttachmentBuilder(buffer, { name: 'termo-ranking.png' });
 
   await interaction.editReply({ files: [anexo] });
