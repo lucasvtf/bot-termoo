@@ -48,6 +48,7 @@ export async function execute(interaction) {
 
   if (partida?.finalizado) {
     const status = partida.venceu ? 'Você já venceu hoje!' : 'Você já usou suas 6 tentativas hoje.';
+    if (partida.venceu) return interaction.editReply({ content: status });
     return interaction.editReply({ content: status, files: [anexoGrid(partida.tentativas, dia.palavra)] });
   }
 
@@ -74,7 +75,11 @@ export async function execute(interaction) {
   else if (finalizado) status = `Suas tentativas acabaram. A palavra era \`${dia.palavra}\`.`;
   else status = `Tentativa ${numTentativas} de ${MAX_TENTATIVAS}.`;
 
-  await interaction.editReply({ content: status, files: [anexoGrid(novasTentativas, dia.palavra)] });
+  if (venceu) {
+    await interaction.editReply({ content: status });
+  } else {
+    await interaction.editReply({ content: status, files: [anexoGrid(novasTentativas, dia.palavra)] });
+  }
 
   const jaEstavaFinalizado = partida?.finalizado ?? false;
   if (finalizado && !jaEstavaFinalizado && process.env.CANAL_TERMO) {
