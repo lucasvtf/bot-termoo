@@ -13,4 +13,9 @@ export const pool = new pg.Pool({
   ssl: needsSsl ? { rejectUnauthorized: false } : false,
 });
 
+pool.on('error', (err) => {
+  // Conexão ociosa morreu (ex.: Neon suspendeu o compute). O pool abre outra na próxima query.
+  console.error('[pg] erro em conexão ociosa:', err.message);
+});
+
 export const query = (text, params) => pool.query(text, params);

@@ -123,13 +123,3 @@ export function renderTermoImagem(tentativas, palavraCerta, {
 
   return canvas.toBuffer('image/png');
 }
-
-export function renderTermoImagemPublica(tentativas, palavraCerta) {
-  return renderTermoImagem(tentativas, palavraCerta, {
-    revelarLetras: false,
-    comTeclado: false,
-    preencherRestante: false,
-    tile: 28,
-    gap: 5,
-  });
-}

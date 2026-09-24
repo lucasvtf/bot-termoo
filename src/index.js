@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
-import { Client, Collection, Events, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
 import { registerCrons } from './cron/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,7 +45,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (err) {
     console.error(err);
     try {
-      const msg = { content: 'Deu ruim ao executar esse comando.', ephemeral: true };
+      const msg = { content: 'Deu ruim ao executar esse comando.', flags: MessageFlags.Ephemeral };
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp(msg);
       } else {
@@ -58,5 +58,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.on(Events.Error, (err) => console.error('client error:', err));
+
+process.on('unhandledRejection', (err) => console.error('[unhandledRejection]', err));
 
 client.login(process.env.DISCORD_TOKEN);

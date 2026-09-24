@@ -1,18 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from 'discord.js';
+import { AttachmentBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { pool } from '../db/pool.js';
 import { upsertUsuario } from '../db/usuarios.js';
-import { garantirPalavraDoDia, dataDeHoje } from '../services/palavraDoDia.js';
-import { MAX_TENTATIVAS, TAMANHO_PALAVRA } from '../services/termoEngine.js';
-import { renderTermoImagem, renderTermoImagemPublica } from '../services/renderTermo.js';
-import { normalizar } from '../utils/normalizar.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PALAVRAS_VALIDAS = new Set(
-  JSON.parse(readFileSync(join(__dirname, '..', 'data', 'palavras-validas.json'), 'utf8')),
-);
+import { garantirPalavraDoDia } from '../services/palavraDoDia.js';
+import { dataDeHoje } from '../utils/datas.js';
+import { MAX_TENTATIVAS } from '../services/termoEngine.js';
+import { validarPalavra } from '../services/palavras.js';
+import { renderTermoImagem } from '../services/renderTermo.js';
 
 export const data = new SlashCommandBuilder()
   .setName('termo')
@@ -27,48 +20,64 @@ function anexoGrid(tentativas, palavraCerta) {
 }
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  await upsertUsuario(interaction.user.id, interaction.user.username);
+  const { palavra: tentativa, erro } = validarPalavra(interaction.options.getString('palavra'));
+  if (erro) return interaction.editReply(erro);
+
+  // Apelido no servidor → nome global → @
+  const nomeExibicao = interaction.member?.displayName ?? interaction.user.displayName;
+  await upsertUsuario(interaction.user.id, interaction.user.username, nomeExibicao);
   const dia = await garantirPalavraDoDia(dataDeHoje());
 
-  const tentativa = normalizar(interaction.options.getString('palavra'));
-  if (tentativa.length !== TAMANHO_PALAVRA || !/^[A-Z]+$/.test(tentativa)) {
-    return interaction.editReply('Tentativa inválida — precisa ter 5 letras.');
-  }
-  if (!PALAVRAS_VALIDAS.has(tentativa)) {
-    return interaction.editReply(`\`${tentativa}\` não é uma palavra reconhecida.`);
-  }
+  const userId = String(interaction.user.id);
+
+  // Garante que a linha existe; o incremento abaixo é atômico (trava a linha),
+  // então tentativas simultâneas não se sobrescrevem nem passam de MAX_TENTATIVAS.
+  await pool.query(
+    `INSERT INTO termo_partidas (usuario_id, dia_id) VALUES ($1, $2)
+     ON CONFLICT (usuario_id, dia_id) DO NOTHING`,
+    [userId, dia.id],
+  );
 
   const { rows } = await pool.query(
-    `SELECT tentativas, finalizado, venceu FROM termo_partidas WHERE usuario_id = $1 AND dia_id = $2`,
-    [String(interaction.user.id), dia.id],
+    `UPDATE termo_partidas
+        SET tentativas     = tentativas || jsonb_build_array($3::text),
+            num_tentativas = num_tentativas + 1,
+            venceu         = ($3::text = $4::text),
+            finalizado     = ($3::text = $4::text) OR num_tentativas + 1 >= $5,
+            updated_at     = now()
+      WHERE usuario_id = $1 AND dia_id = $2
+        AND NOT finalizado
+        AND NOT (tentativas ? $3::text)
+      RETURNING tentativas, num_tentativas, venceu, finalizado`,
+    [userId, dia.id, tentativa, dia.palavra, MAX_TENTATIVAS],
   );
-  const partida = rows[0];
 
-  if (partida?.finalizado) {
-    const status = partida.venceu ? 'Você já venceu hoje!' : 'Você já usou suas 6 tentativas hoje.';
-    if (partida.venceu) return interaction.editReply({ content: status });
-    return interaction.editReply({ content: status, files: [anexoGrid(partida.tentativas, dia.palavra)] });
+  if (rows.length === 0) {
+    // Nada foi gravado: ou a partida já estava finalizada, ou a palavra é repetida.
+    const { rows: atual } = await pool.query(
+      `SELECT tentativas, finalizado, venceu FROM termo_partidas WHERE usuario_id = $1 AND dia_id = $2`,
+      [userId, dia.id],
+    );
+    const partida = atual[0];
+    if (partida.finalizado) {
+      const status = partida.venceu ? 'Você já venceu hoje!' : `Você já usou suas ${MAX_TENTATIVAS} tentativas hoje.`;
+      if (partida.venceu) return interaction.editReply({ content: status });
+      return interaction.editReply({ content: status, files: [anexoGrid(partida.tentativas, dia.palavra)] });
+    }
+    return interaction.editReply({
+      content: `Você já tentou \`${tentativa}\` hoje — essa não contou.`,
+      files: [anexoGrid(partida.tentativas, dia.palavra)],
+    });
   }
 
-  const tentativasAnteriores = partida?.tentativas ?? [];
-  const novasTentativas = [...tentativasAnteriores, tentativa];
-  const numTentativas = novasTentativas.length;
-  const venceu = tentativa === dia.palavra;
-  const finalizado = venceu || numTentativas >= MAX_TENTATIVAS;
-
-  await pool.query(
-    `INSERT INTO termo_partidas (usuario_id, dia_id, tentativas, num_tentativas, venceu, finalizado, updated_at)
-     VALUES ($1, $2, $3::jsonb, $4, $5, $6, now())
-     ON CONFLICT (usuario_id, dia_id) DO UPDATE SET
-       tentativas = EXCLUDED.tentativas,
-       num_tentativas = EXCLUDED.num_tentativas,
-       venceu = EXCLUDED.venceu,
-       finalizado = EXCLUDED.finalizado,
-       updated_at = now()`,
-    [String(interaction.user.id), dia.id, JSON.stringify(novasTentativas), numTentativas, venceu, finalizado],
-  );
+  const {
+    tentativas: novasTentativas,
+    num_tentativas: numTentativas,
+    venceu,
+    finalizado,
+  } = rows[0];
 
   let status;
   if (venceu) status = `Você acertou em ${numTentativas}/${MAX_TENTATIVAS}!`;
@@ -81,20 +90,14 @@ export async function execute(interaction) {
     await interaction.editReply({ content: status, files: [anexoGrid(novasTentativas, dia.palavra)] });
   }
 
-  const jaEstavaFinalizado = partida?.finalizado ?? false;
-  if (finalizado && !jaEstavaFinalizado && process.env.CANAL_TERMO) {
+  // Só o UPDATE que muda finalizado de false pra true retorna linha com finalizado = true,
+  // então o aviso público sai exatamente uma vez. Sem grid: as cores entregariam dicas
+  // pra quem ainda vai jogar (a palavra e os grids só são revelados no anúncio da meia-noite).
+  if (finalizado && process.env.CANAL_TERMO) {
     const canal = await interaction.client.channels.fetch(process.env.CANAL_TERMO).catch(() => null);
-    if (canal) {
-      const resumo = venceu
-        ? `<@${interaction.user.id}> resolveu o Termo de hoje em ${numTentativas}/${MAX_TENTATIVAS}`
-        : `<@${interaction.user.id}> não resolveu o Termo de hoje (${MAX_TENTATIVAS}/${MAX_TENTATIVAS})`;
-      const bufferPublico = renderTermoImagemPublica(novasTentativas, dia.palavra);
-      const anexoPublico = new AttachmentBuilder(bufferPublico, { name: 'termo-resultado.png' });
-      const embed = new EmbedBuilder()
-        .setDescription(resumo)
-        .setImage('attachment://termo-resultado.png')
-        .setColor(venceu ? 0x57f287 : 0xed4245);
-      await canal.send({ embeds: [embed], files: [anexoPublico], allowedMentions: { parse: [] } });
-    }
+    const content = venceu
+      ? `✅ <@${userId}> acertou o Termo de hoje em ${numTentativas}/${MAX_TENTATIVAS}`
+      : `❌ <@${userId}> não acertou o Termo de hoje`;
+    await canal?.send({ content, allowedMentions: { parse: [] } });
   }
 }

@@ -1,17 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import { SlashCommandBuilder } from 'discord.js';
-import { pool } from '../db/pool.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { requireAdmin } from '../utils/admin.js';
-import { normalizar } from '../utils/normalizar.js';
-import { TAMANHO_PALAVRA } from '../services/termoEngine.js';
-import { rerolarPalavraDoDia, definirPalavraDoDia, banirPalavra, dataDeHoje } from '../services/palavraDoDia.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PALAVRAS_VALIDAS = new Set(
-  JSON.parse(readFileSync(join(__dirname, '..', 'data', 'palavras-validas.json'), 'utf8')),
-);
+import { validarFormato, validarPalavra } from '../services/palavras.js';
+import {
+  rerolarPalavraDoDia, definirPalavraDoDia, banirPalavra, statusDoDia, garantirPalavraDoDia,
+} from '../services/palavraDoDia.js';
+import { dataDeHoje } from '../utils/datas.js';
 
 export const data = new SlashCommandBuilder()
   .setName('admin-termo')
@@ -34,6 +27,16 @@ export const data = new SlashCommandBuilder()
       ),
   );
 
+async function recusarSeAlguemComecou(interaction, hoje) {
+  const { iniciadas } = await statusDoDia(hoje);
+  if (iniciadas === 0) return false;
+  await interaction.reply({
+    content: `Não dá pra trocar a palavra: ${iniciadas} pessoa(s) já começaram a de hoje.`,
+    flags: MessageFlags.Ephemeral,
+  });
+  return true;
+}
+
 export async function execute(interaction) {
   if (!(await requireAdmin(interaction))) return;
 
@@ -41,63 +44,44 @@ export async function execute(interaction) {
 
   if (sub === 'rerolar') {
     const hoje = dataDeHoje();
-    const { rows } = await pool.query(
-      `SELECT COUNT(*)::int AS total
-         FROM termo_partidas tp
-         JOIN termo_dias td ON td.id = tp.dia_id
-        WHERE td.data = $1 AND tp.finalizado = TRUE`,
-      [hoje],
-    );
-    if (rows[0].total > 0) {
-      return interaction.reply({
-        content: `Não dá pra rerolar: ${rows[0].total} pessoa(s) já finalizaram a palavra de hoje.`,
-        ephemeral: true,
-      });
-    }
+    if (await recusarSeAlguemComecou(interaction, hoje)) return;
     const dia = await rerolarPalavraDoDia(hoje);
-    return interaction.reply({ content: `Nova palavra do dia sorteada (\`${dia.palavra}\`).`, ephemeral: true });
+    return interaction.reply({ content: `Nova palavra do dia sorteada (\`${dia.palavra}\`).`, flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'definir-palavra') {
-    const palavra = normalizar(interaction.options.getString('palavra'));
-    if (palavra.length !== TAMANHO_PALAVRA || !/^[A-Z]+$/.test(palavra)) {
-      return interaction.reply({ content: 'Palavra inválida — precisa ter 5 letras.', ephemeral: true });
-    }
-    if (!PALAVRAS_VALIDAS.has(palavra)) {
-      return interaction.reply({ content: `\`${palavra}\` não está na lista de palavras válidas.`, ephemeral: true });
-    }
-    const dia = await definirPalavraDoDia(palavra, dataDeHoje());
-    return interaction.reply({ content: `Palavra do dia definida como \`${dia.palavra}\`.`, ephemeral: true });
+    const { palavra, erro } = validarPalavra(interaction.options.getString('palavra'));
+    if (erro) return interaction.reply({ content: erro, flags: MessageFlags.Ephemeral });
+    const hoje = dataDeHoje();
+    if (await recusarSeAlguemComecou(interaction, hoje)) return;
+    const dia = await definirPalavraDoDia(palavra, hoje);
+    return interaction.reply({ content: `Palavra do dia definida como \`${dia.palavra}\`.`, flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'banir-palavra') {
-    const palavra = normalizar(interaction.options.getString('palavra'));
-    if (palavra.length !== TAMANHO_PALAVRA || !/^[A-Z]+$/.test(palavra)) {
-      return interaction.reply({ content: 'Palavra inválida — precisa ter 5 letras.', ephemeral: true });
-    }
+    // Só formato: dá pra banir qualquer palavra de 5 letras, mesmo fora da lista de válidas.
+    const { palavra, erro } = validarFormato(interaction.options.getString('palavra'));
+    if (erro) return interaction.reply({ content: erro, flags: MessageFlags.Ephemeral });
 
     await banirPalavra(palavra, interaction.user.id);
 
     const hoje = dataDeHoje();
-    const { rows } = await pool.query(
-      `SELECT td.palavra,
-              EXISTS (
-                SELECT 1 FROM termo_partidas tp WHERE tp.dia_id = td.id AND tp.finalizado = TRUE
-              ) AS alguem_finalizou
-         FROM termo_dias td
-        WHERE td.data = $1`,
-      [hoje],
-    );
-    const diaAtual = rows[0];
-
-    if (diaAtual?.palavra === palavra && !diaAtual.alguem_finalizou) {
-      const novoDia = await rerolarPalavraDoDia(hoje);
+    const diaAtual = await garantirPalavraDoDia(hoje);
+    if (diaAtual.palavra === palavra) {
+      const { iniciadas } = await statusDoDia(hoje);
+      if (iniciadas === 0) {
+        const novoDia = await rerolarPalavraDoDia(hoje);
+        return interaction.reply({
+          content: `\`${palavra}\` banida do sorteio. Como era a palavra de hoje e ninguém tinha começado, já sorteei outra: \`${novoDia.palavra}\`.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
       return interaction.reply({
-        content: `\`${palavra}\` banida do sorteio. Como era a palavra de hoje e ninguém tinha terminado, já sorteei outra: \`${novoDia.palavra}\`.`,
-        ephemeral: true,
+        content: `\`${palavra}\` banida de sorteios futuros. Hoje ela continua, porque ${iniciadas} pessoa(s) já começaram.`,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
-    return interaction.reply({ content: `\`${palavra}\` banida do sorteio de palavras futuras.`, ephemeral: true });
+    return interaction.reply({ content: `\`${palavra}\` banida do sorteio de palavras futuras.`, flags: MessageFlags.Ephemeral });
   }
 }

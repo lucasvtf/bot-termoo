@@ -1,0 +1,31 @@
+// Estatísticas pessoais do /termo-stats (lógica pura, testada em estatisticas.test.js)
+import { calcularStreaks, calcularMaiorStreak } from './streaks.js';
+import { resumirPartidas, histograma } from './resumoDia.js';
+
+// partidasOrdenadasDesc: finalizadas do usuário, mais recente primeiro ({ data, venceu, num_tentativas })
+export function calcularEstatisticas(partidasOrdenadasDesc, hoje) {
+  const { jogaram, acertaram, distribuicao } = resumirPartidas(partidasOrdenadasDesc);
+  const tentativasVitorias = partidasOrdenadasDesc.filter((p) => p.venceu).map((p) => p.num_tentativas);
+  const media = tentativasVitorias.length > 0
+    ? tentativasVitorias.reduce((a, b) => a + b, 0) / tentativasVitorias.length
+    : null;
+
+  return {
+    jogos: jogaram,
+    pctVitorias: jogaram > 0 ? Math.round((acertaram / jogaram) * 100) : 0,
+    media,
+    streakAtual: calcularStreaks(partidasOrdenadasDesc, hoje).streakAcertos,
+    maiorStreak: calcularMaiorStreak(partidasOrdenadasDesc),
+    distribuicao,
+  };
+}
+
+export function montarEstatisticas(s) {
+  return [
+    `Jogos: **${s.jogos}** · Vitórias: **${s.pctVitorias}%** · Média: **${s.media !== null ? s.media.toFixed(1) : '—'}**`,
+    `Streak atual: **${s.streakAtual}** · Maior streak: **${s.maiorStreak}**`,
+    '```',
+    histograma(s.distribuicao),
+    '```',
+  ].join('\n');
+}

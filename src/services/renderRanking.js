@@ -66,7 +66,7 @@ function desenharBanner(ctx, y, { cor, corFundo, rotulo, nome, sufixo }) {
   ctx.fillText(` — ${sufixo}`, PAD + larguraRotulo + larguraNome, cy + 1);
 }
 
-export function renderRankingImagem(stats, { destaqueStreak = null, destaqueDias = null } = {}) {
+export function renderRankingImagem(stats, { destaqueStreak = null, destaqueDias = null, titulo = 'Ranking do Termo' } = {}) {
   const banners = [
     destaqueStreak && {
       cor: CORES.verde,
@@ -96,7 +96,7 @@ export function renderRankingImagem(stats, { destaqueStreak = null, destaqueDias
   ctx.font = 'bold 26px Arial';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Ranking do Termo', PAD, ALTURA_TITULO / 2 + 4);
+  ctx.fillText(titulo, PAD, ALTURA_TITULO / 2 + 4);
 
   banners.forEach((banner, i) => {
     desenharBanner(ctx, ALTURA_TITULO + i * ALTURA_BANNER, banner);

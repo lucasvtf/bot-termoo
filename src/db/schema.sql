@@ -4,12 +4,18 @@ CREATE TABLE IF NOT EXISTS usuarios (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Apelido no servidor / nome global; atualizado a cada /termo. Ranking cai pro username se for NULL.
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS nome_exibicao TEXT;
+
 CREATE TABLE IF NOT EXISTS termo_dias (
   id          SERIAL PRIMARY KEY,
   data        DATE NOT NULL UNIQUE,
   palavra     TEXT NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Marca se o anúncio da meia-noite (palavra + resumo) desse dia já foi postado.
+ALTER TABLE termo_dias ADD COLUMN IF NOT EXISTS anunciado BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS termo_partidas (
   id             SERIAL PRIMARY KEY,
