@@ -9,14 +9,17 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 
 - Todo dia (00:00 BRT) o bot sorteia uma **palavra do dia**, igual pra todo
   mundo no servidor.
-- Cada jogador tem até **6 tentativas** por dia, uma por dia — como o Termo
-  original.
+- Cada jogador tem até **6 tentativas** por dia, como no Termo original.
+  Palavra repetida não gasta tentativa.
 - As tentativas são respondidas de forma **privada** (só quem jogou vê), pra
   não estragar o jogo pros outros. O resultado sai como **imagem**, com o
   grid de cores e o teclado mostrando o que já foi descoberto.
-- Quando alguém **termina** (acerta ou esgota as tentativas), sai um resumo
-  público no canal configurado — só com o grid de cores, sem revelar as
-  letras, igual ao compartilhamento do Wordle/Termo real.
+- Quando alguém **termina** (acerta ou esgota as tentativas), sai só uma linha
+  no canal configurado (`✅ @Fulano acertou o Termo de hoje em 3/6`) — **sem
+  grid**, porque as cores entregariam dicas pra quem ainda vai jogar.
+- À **meia-noite** sai o anúncio do novo Termo com a palavra de ontem, quantos
+  jogaram/acertaram, quem acertou mais rápido e a distribuição de tentativas.
+  Na segunda-feira, inclui também o **campeão da semana**.
 
 ---
 
@@ -27,15 +30,16 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 | Comando                     | O que faz                                                                                     |
 | --------------------------- | --------------------------------------------------------------------------------------------- |
 | `/termo palavra:<5 letras>` | Registra uma tentativa da palavra do dia. Resposta privada com o grid + teclado em imagem.    |
-| `/termo-ranking`            | Ranking em imagem: streak de acertos, streak de dias jogando, vitórias e média de tentativas. |
+| `/termo-ranking [periodo]`  | Ranking em imagem (vitórias e média). `periodo`: semana (seg–dom), mês ou geral (padrão). Streaks são sempre do histórico todo. |
+| `/termo-stats [usuario]`    | Estatísticas pessoais (suas ou de outra pessoa): jogos, % vitórias, média, streak atual e máximo, distribuição de tentativas. |
 
 ### Admin (restrito por `ADMIN_USER_IDS` no `.env`)
 
 | Comando                                           | O que faz                                                                                                                                        |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/admin-termo rerolar`                            | Sorteia uma nova palavra do dia, descartando a atual. Recusa se alguém já finalizou a de hoje.                                                   |
-| `/admin-termo definir-palavra palavra:<5 letras>` | Define manualmente a palavra do dia.                                                                                                             |
-| `/admin-termo banir-palavra palavra:<5 letras>`   | Bane uma palavra permanentemente do sorteio (persistido no banco). Se for a palavra de hoje e ninguém tiver terminado, já sorteia outra na hora. |
+| `/admin-termo rerolar`                            | Sorteia uma nova palavra do dia. Recusa se alguém já **começou** a de hoje (pra ninguém perder progresso).                                       |
+| `/admin-termo definir-palavra palavra:<5 letras>` | Define manualmente a palavra do dia. Mesma trava do rerolar.                                                                                     |
+| `/admin-termo banir-palavra palavra:<5 letras>`   | Bane uma palavra permanentemente do sorteio. Se for a palavra de hoje e ninguém tiver começado, já sorteia outra na hora.                         |
 
 ---
 
@@ -43,7 +47,7 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 
 | Cron             | Quando    | O que faz                                                                                                                                                |
 | ---------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **palavraDoDia** | 00:00 BRT | Garante que existe uma palavra sorteada pro dia. Idempotente — se o bot reiniciar ou o cron atrasar, o `/termo` também garante a palavra na hora (lazy). |
+| **palavraDoDia** | 00:00 BRT | Garante a palavra do dia e posta o anúncio do dia anterior (+ campeão da semana às segundas). Também roda no startup: se o bot estava fora do ar à meia-noite, o anúncio sai quando ele volta. Idempotente — a coluna `termo_dias.anunciado` garante que cada dia é anunciado uma vez só. |
 
 ---
 
@@ -66,6 +70,9 @@ npm run deploy
 npm start
 ```
 
+Ao atualizar o bot: rode `npm run db:migrate` sempre que o `schema.sql` mudar
+e `npm run deploy` sempre que um comando for criado ou tiver opções alteradas.
+
 ### Variáveis de ambiente
 
 | Variável            | Pra quê                                                            |
@@ -75,7 +82,7 @@ npm start
 | `DISCORD_GUILD_ID`  | ID do servidor onde os comandos são registrados.                   |
 | `DATABASE_URL`      | Connection string do Postgres (Neon).                              |
 | `ADMIN_USER_IDS`    | IDs Discord (separados por vírgula) que podem usar `/admin-termo`. |
-| `CANAL_TERMO`       | Canal onde sai o resumo público de quem terminou o dia.            |
+| `CANAL_TERMO`       | Canal dos avisos de quem terminou e do anúncio da meia-noite.      |
 
 ---
 
@@ -86,7 +93,9 @@ npm start
 | `npm start`          | Sobe o bot.                                                |
 | `npm run deploy`     | Registra os slash commands no `DISCORD_GUILD_ID`.          |
 | `npm run db:migrate` | Aplica o schema (idempotente, pode rodar várias vezes).    |
-| `npm test`           | Roda os testes da lógica de feedback (`calcularFeedback`). |
+| `npm test`           | Roda os testes da lógica pura (feedback, streaks, resumo do dia, estatísticas, datas). |
+| `npm run db:reset-ranking -- --confirmar` | Apaga o histórico de partidas (mantém usuários, banidas e palavra do dia). |
+| `npm run db:reset -- --confirmar`         | Apaga tudo.                                                                |
 
 ---
 
@@ -99,21 +108,27 @@ termo-bot/
     ├── index.js                   inicialização do bot, carga dinâmica de comandos, cron
     ├── deploy-commands.js         registra slash commands na guild
     ├── commands/
-    │   ├── termo.js               joga a tentativa do dia
-    │   ├── termo-ranking.js       ranking em imagem
+    │   ├── termo.js               joga a tentativa do dia (incremento atômico no banco)
+    │   ├── termo-ranking.js       ranking em imagem (semana / mês / geral)
+    │   ├── termo-stats.js         estatísticas pessoais
     │   └── admin-termo.js         rerolar / definir-palavra / banir-palavra
     ├── services/
     │   ├── termoEngine.js         calcularFeedback (lógica pura, testada)
-    │   ├── termoEngine.test.js
+    │   ├── palavras.js            listas de palavras + validarFormato / validarPalavra
     │   ├── palavraDoDia.js        sorteio/persistência da palavra do dia + banimento
+    │   ├── streaks.js             streak atual e maior streak (testado)
+    │   ├── estatisticas.js        cálculo e texto do /termo-stats (testado)
+    │   ├── resumoDia.js           resumo do dia, histograma e campeão da semana (testado)
+    │   ├── anuncioDiario.js       posta o anúncio da meia-noite (idempotente)
     │   ├── renderTermo.js         desenha o grid + teclado em PNG (@napi-rs/canvas)
-    │   └── renderRanking.js       desenha o ranking em PNG
+    │   ├── renderRanking.js       desenha o ranking em PNG
+    │   └── *.test.js
     ├── cron/
     │   ├── index.js
-    │   └── palavraDoDia.js        00:00 BRT
+    │   └── palavraDoDia.js        00:00 BRT + execução no startup
     ├── db/
-    │   ├── pool.js                pool pg + SSL automático
-    │   ├── schema.sql             4 tabelas
+    │   ├── pool.js                pool pg + SSL automático + handler de erro de conexão
+    │   ├── schema.sql             4 tabelas (idempotente)
     │   ├── migrate.js
     │   └── usuarios.js            upsert
     ├── data/
@@ -121,6 +136,7 @@ termo-bot/
     │   └── palavras-validas.json     palavras aceitas como tentativa (amplo)
     └── utils/
         ├── admin.js                requireAdmin
+        ├── datas.js                hoje/ontem/início da semana e do mês (fuso BRT)
         └── normalizar.js           uppercase + remove acento
 ```
 
@@ -128,8 +144,10 @@ termo-bot/
 
 ## Modelo de dados
 
-- **`usuarios`**: `id` (Discord), `username`, `created_at`.
-- **`termo_dias`**: `id`, `data` (única, fuso America/Sao_Paulo), `palavra`.
+- **`usuarios`**: `id` (Discord), `username`, `nome_exibicao` (apelido no
+  servidor, atualizado a cada `/termo`), `created_at`.
+- **`termo_dias`**: `id`, `data` (única, fuso America/Sao_Paulo), `palavra`,
+  `anunciado` (se o anúncio da meia-noite desse dia já saiu).
 - **`termo_partidas`**: `id`, `usuario_id`, `dia_id`, `tentativas` (JSONB),
   `num_tentativas`, `venceu`, `finalizado`. Única por `(usuario_id, dia_id)`.
 - **`termo_banidas`**: `palavra` (PK), `banida_por`, `created_at` — palavras
