@@ -7,7 +7,7 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 
 ## Como funciona
 
-- Todo dia (00:00 BRT) o bot sorteia uma **palavra do dia**, igual pra todo
+- Todo dia (00:00 no fuso do jogo — Lisboa por padrão) o bot sorteia uma **palavra do dia**, igual pra todo
   mundo no servidor.
 - Cada jogador tem até **6 tentativas** por dia, como no Termo original.
   Palavra repetida não gasta tentativa.
@@ -47,7 +47,7 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 
 | Cron             | Quando    | O que faz                                                                                                                                                |
 | ---------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **palavraDoDia** | 00:00 BRT | Garante a palavra do dia e posta o anúncio do dia anterior (+ campeão da semana às segundas). Também roda no startup: se o bot estava fora do ar à meia-noite, o anúncio sai quando ele volta. Idempotente — a coluna `termo_dias.anunciado` garante que cada dia é anunciado uma vez só. |
+| **palavraDoDia** | 00:00 (fuso do jogo) | Garante a palavra do dia e posta o anúncio do dia anterior (+ campeão da semana às segundas). Também roda no startup: se o bot estava fora do ar à meia-noite, o anúncio sai quando ele volta. Idempotente — a coluna `termo_dias.anunciado` garante que cada dia é anunciado uma vez só. |
 
 ---
 
@@ -83,6 +83,7 @@ e `npm run deploy` sempre que um comando for criado ou tiver opções alteradas.
 | `DATABASE_URL`      | Connection string do Postgres (Neon).                              |
 | `ADMIN_USER_IDS`    | IDs Discord (separados por vírgula) que podem usar `/admin-termo`. |
 | `CANAL_TERMO`       | Canal dos avisos de quem terminou e do anúncio da meia-noite.      |
+| `FUSO_HORARIO`      | Opcional. Fuso do jogo (quando o dia vira). Padrão `Europe/Lisbon`. |
 
 ---
 
@@ -125,7 +126,7 @@ termo-bot/
     │   └── *.test.js
     ├── cron/
     │   ├── index.js
-    │   └── palavraDoDia.js        00:00 BRT + execução no startup
+    │   └── palavraDoDia.js        00:00 no fuso do jogo + execução no startup
     ├── db/
     │   ├── pool.js                pool pg + SSL automático + handler de erro de conexão
     │   ├── schema.sql             4 tabelas (idempotente)
@@ -136,7 +137,7 @@ termo-bot/
     │   └── palavras-validas.json     palavras aceitas como tentativa (amplo)
     └── utils/
         ├── admin.js                requireAdmin
-        ├── datas.js                hoje/ontem/início da semana e do mês (fuso BRT)
+        ├── datas.js                hoje/ontem/início da semana e do mês (fuso do jogo)
         └── normalizar.js           uppercase + remove acento
 ```
 
@@ -146,7 +147,7 @@ termo-bot/
 
 - **`usuarios`**: `id` (Discord), `username`, `nome_exibicao` (apelido no
   servidor, atualizado a cada `/termo`), `created_at`.
-- **`termo_dias`**: `id`, `data` (única, fuso America/Sao_Paulo), `palavra`,
+- **`termo_dias`**: `id`, `data` (única, no fuso do jogo), `palavra`,
   `anunciado` (se o anúncio da meia-noite desse dia já saiu).
 - **`termo_partidas`**: `id`, `usuario_id`, `dia_id`, `tentativas` (JSONB),
   `num_tentativas`, `venceu`, `finalizado`. Única por `(usuario_id, dia_id)`.

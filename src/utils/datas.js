@@ -1,4 +1,5 @@
-const FUSO = 'America/Sao_Paulo';
+// Fuso do jogo: define quando o dia vira (palavra nova + anúncio). Configurável via .env.
+export const FUSO = process.env.FUSO_HORARIO || 'Europe/Lisbon';
 
 // 'YYYY-MM-DD' de hoje no fuso do jogo
 export function dataDeHoje() {

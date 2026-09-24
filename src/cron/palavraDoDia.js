@@ -1,13 +1,13 @@
 import cron from 'node-cron';
 import { garantirPalavraDoDia } from '../services/palavraDoDia.js';
 import { anunciarDiaAnterior } from '../services/anuncioDiario.js';
-import { dataDeHoje } from '../utils/datas.js';
+import { dataDeHoje, FUSO } from '../utils/datas.js';
 
 export function registerPalavraDoDia(client) {
   cron.schedule('0 0 * * *', () => rodarPalavraDoDia(client).catch((e) => console.error('[palavraDoDia]', e)), {
-    timezone: 'America/Sao_Paulo',
+    timezone: FUSO,
   });
-  console.log('[cron] palavraDoDia registrado (00:00 BRT)');
+  console.log(`[cron] palavraDoDia registrado (00:00 ${FUSO})`);
 
   // No startup também: se o bot estava fora do ar à meia-noite, o anúncio sai agora
   // (idempotente — se já saiu, não faz nada).
