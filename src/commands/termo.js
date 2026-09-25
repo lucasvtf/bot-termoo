@@ -29,8 +29,8 @@ export async function execute(interaction) {
   const nomeExibicao = interaction.member?.displayName ?? interaction.user.displayName;
   await upsertUsuario(interaction.user.id, interaction.user.username, nomeExibicao);
   const dia = await garantirPalavraDoDia(dataDeHoje(), 'termo');
-  const [palavraCerta] = palavraCertas;
-  const MAX_TENTATIVAS = maxTentativas(palavraCertas.length);
+  const [palavraCerta] = dia.palavras;
+  const MAX_TENTATIVAS = maxTentativas(dia.palavras.length);
 
   const userId = String(interaction.user.id);
 
