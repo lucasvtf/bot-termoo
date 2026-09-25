@@ -24,3 +24,9 @@ test('texto sem vitórias mostra média como —', () => {
   const s = calcularEstatisticas([{ data: '2026-09-24', venceu: false, num_tentativas: 6 }], HOJE);
   assert.match(montarEstatisticas(s), /Vitórias: \*\*0%\*\* · Média: \*\*—\*\*/);
 });
+
+test('estatísticas do dueto: histograma de 2 a 7', () => {
+  const s = calcularEstatisticas([{ data: '2026-09-24', venceu: true, num_tentativas: 5 }], HOJE, 2);
+  assert.deepEqual(Object.keys(s.distribuicao), ['2', '3', '4', '5', '6', '7', 'X']);
+  assert.equal(s.distribuicao[5], 1);
+});

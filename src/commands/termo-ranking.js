@@ -2,6 +2,7 @@ import { AttachmentBuilder, SlashCommandBuilder } from 'discord.js';
 import { pool } from '../db/pool.js';
 import { renderRankingImagem } from '../services/renderRanking.js';
 import { calcularStreaks } from '../services/streaks.js';
+import { MODOS } from '../services/modos.js';
 import {
   dataDeHoje, inicioDaSemana, inicioDoMes, nomeDoMes, formatarDiaMes,
 } from '../utils/datas.js';
@@ -10,7 +11,13 @@ const TOP_N = 20;
 
 export const data = new SlashCommandBuilder()
   .setName('termo-ranking')
-  .setDescription('Ranking do Termo: streak de acertos, vitórias e constância.')
+  .setDescription('Ranking de Termo, Dueto ou Quarteto: vitórias, média e streaks.')
+  .addStringOption((o) =>
+    o
+      .setName('modo')
+      .setDescription('Modo do ranking (padrão: Termo)')
+      .addChoices(...Object.entries(MODOS).map(([value, { nome }]) => ({ name: nome, value }))),
+  )
   .addStringOption((o) =>
     o
       .setName('periodo')
@@ -25,28 +32,31 @@ export const data = new SlashCommandBuilder()
 // Períodos de calendário: semana começa na segunda, mês no dia 1.
 // Filtram só vitórias/média (o que define a posição); streaks são sempre do histórico todo.
 const PERIODOS = {
-  semana: (hoje) => {
+  semana: (hoje, jogo) => {
     const inicio = inicioDaSemana(hoje);
-    return { inicio, titulo: `Ranking do Termo — semana de ${formatarDiaMes(inicio)}`, nome: 'nesta semana' };
+    return { inicio, titulo: `Ranking do ${jogo} — semana de ${formatarDiaMes(inicio)}`, nome: 'nesta semana' };
   },
-  mes: (hoje) => ({ inicio: inicioDoMes(hoje), titulo: `Ranking do Termo — ${nomeDoMes(hoje)}`, nome: 'neste mês' }),
-  geral: () => ({ inicio: null, titulo: 'Ranking do Termo', nome: null }),
+  mes: (hoje, jogo) => ({ inicio: inicioDoMes(hoje), titulo: `Ranking do ${jogo} — ${nomeDoMes(hoje)}`, nome: 'neste mês' }),
+  geral: (_hoje, jogo) => ({ inicio: null, titulo: `Ranking do ${jogo}`, nome: null }),
 };
 
 export async function execute(interaction) {
   await interaction.deferReply();
+  const modo = interaction.options.getString('modo') ?? 'termo';
+  const jogo = MODOS[modo].nome;
 
   const { rows } = await pool.query(
     `SELECT tp.usuario_id, COALESCE(u.nome_exibicao, u.username) AS username, td.data::text AS data, tp.venceu, tp.num_tentativas
        FROM termo_partidas tp
        JOIN termo_dias td ON td.id = tp.dia_id
        JOIN usuarios u ON u.id = tp.usuario_id
-      WHERE tp.finalizado = TRUE AND td.modo = 'termo'
+      WHERE tp.finalizado = TRUE AND td.modo = $1
       ORDER BY tp.usuario_id, td.data DESC`,
+    [modo],
   );
 
   if (rows.length === 0) {
-    return interaction.editReply({ content: 'Ninguém jogou o Termo ainda.' });
+    return interaction.editReply({ content: `Ninguém terminou um ${jogo} ainda.` });
   }
 
   const hoje = dataDeHoje();
@@ -56,7 +66,7 @@ export async function execute(interaction) {
     porUsuario.get(row.usuario_id).partidas.push(row);
   }
 
-  const periodo = PERIODOS[interaction.options.getString('periodo') ?? 'geral'](hoje);
+  const periodo = PERIODOS[interaction.options.getString('periodo') ?? 'geral'](hoje, jogo);
 
   const todos = [...porUsuario.entries()].map(([usuarioId, { username, partidas }]) => {
     const doPeriodo = periodo.inicio ? partidas.filter((p) => p.data >= periodo.inicio) : partidas;
@@ -73,7 +83,7 @@ export async function execute(interaction) {
   // Na posição só entra quem jogou no período; os destaques (streaks) consideram todo mundo.
   const stats = todos.filter((s) => s.jogadas > 0);
   if (stats.length === 0) {
-    return interaction.editReply({ content: `Ninguém terminou um Termo ${periodo.nome} ainda.` });
+    return interaction.editReply({ content: `Ninguém terminou um ${jogo} ${periodo.nome} ainda.` });
   }
 
   stats.sort((a, b) =>

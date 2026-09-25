@@ -1,10 +1,11 @@
 // Estatísticas pessoais do /termo-stats (lógica pura, testada em estatisticas.test.js)
 import { calcularStreaks, calcularMaiorStreak } from './streaks.js';
-import { resumirPartidas, histograma } from './resumoDia.js';
+import { resumirPartidas, histograma, faixaDeTentativas } from './resumoDia.js';
 
 // partidasOrdenadasDesc: finalizadas do usuário, mais recente primeiro ({ data, venceu, num_tentativas })
-export function calcularEstatisticas(partidasOrdenadasDesc, hoje) {
-  const { jogaram, acertaram, distribuicao } = resumirPartidas(partidasOrdenadasDesc);
+// numPalavras: 1 (Termo), 2 (Dueto) ou 4 (Quarteto) — define a faixa do histograma.
+export function calcularEstatisticas(partidasOrdenadasDesc, hoje, numPalavras = 1) {
+  const { jogaram, acertaram, distribuicao } = resumirPartidas(partidasOrdenadasDesc, faixaDeTentativas(numPalavras));
   const tentativasVitorias = partidasOrdenadasDesc.filter((p) => p.venceu).map((p) => p.num_tentativas);
   const media = tentativasVitorias.length > 0
     ? tentativasVitorias.reduce((a, b) => a + b, 0) / tentativasVitorias.length

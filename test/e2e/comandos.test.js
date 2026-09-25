@@ -122,19 +122,29 @@ test('admin: rerolar dueto é recusado depois que alguém começou', { skip: pul
   assert.match(r.content, /já começaram o Dueto/);
 });
 
-test('/termo-ranking e /termo-stats respondem', { skip: pular }, async () => {
-  const rk = await rodar('termo-ranking', { strings: {} });
-  assert.equal(rk.arquivos, 1);
+test('/termo-ranking por modo e /termo-stats com os 3 modos', { skip: pular }, async () => {
+  assert.equal((await rodar('termo-ranking', { strings: {} })).arquivos, 1);
+  assert.equal((await rodar('termo-ranking', { strings: { modo: 'dueto', periodo: 'semana' } })).arquivos, 1);
+  // quem terminou o quarteto foi o usuário 200, que não jogou termo nem dueto
+  assert.equal((await rodar('termo-ranking', { strings: { modo: 'quarteto' } })).arquivos, 1);
+
   const st = await rodar('termo-stats', {});
-  assert.equal(st.embeds.length, 1);
+  const desc = st.embeds[0].data.description;
+  assert.match(desc, /\*\*Termo\*\*\nJogos: \*\*1\*\*/);
+  assert.match(desc, /\*\*Dueto\*\*\nJogos: \*\*1\*\*/);
+  assert.match(desc, /\*\*Quarteto\*\*: ainda não jogou/);
 });
 
-test('anúncio da meia-noite sai uma vez só', { skip: pular }, async () => {
+test('anúncio da meia-noite: uma mensagem com os 3 modos, uma vez só', { skip: pular }, async () => {
   const ontem = datas.diaAnterior(hoje());
   const { palavras: [palavraOntem] } = await pd.garantirPalavraDoDia(ontem, 'termo');
+  const { palavras: dueto } = await pd.garantirPalavraDoDia(ontem, 'dueto');
+  await pd.garantirPalavraDoDia(ontem, 'quarteto');
   const cliente = { channels: { fetch: async () => ({ send: async (m) => canal.push(m.content) }) } };
   await anunciarDiaAnterior(cliente);
   await anunciarDiaAnterior(cliente);
   assert.equal(canal.length, 1);
-  assert.match(canal.splice(0)[0], new RegExp(`A palavra de ontem era \`${palavraOntem}\``));
+  assert.match(canal[0], /\*\*Quarteto\*\* · palavras de ontem: /);
+  assert.ok(canal[0].includes(dueto[1]));
+  assert.match(canal.splice(0)[0], new RegExp(`\\*\\*Termo\\*\\* · palavra de ontem: \`${palavraOntem}\``));
 });

@@ -17,9 +17,10 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 - Quando alguém **termina** (acerta ou esgota as tentativas), sai só uma linha
   no canal configurado (`✅ @Fulano acertou o Termo de hoje em 3/6`) — **sem
   grid**, porque as cores entregariam dicas pra quem ainda vai jogar.
-- À **meia-noite** sai o anúncio do novo Termo com a palavra de ontem, quantos
-  jogaram/acertaram, quem acertou mais rápido e a distribuição de tentativas.
-  Na segunda-feira, inclui também o **campeão da semana**.
+- À **meia-noite** sai um anúncio único com as palavras de ontem dos 3 modos e,
+  pra cada um, quantos jogaram/acertaram, quem acertou mais rápido e a
+  distribuição de tentativas. Na segunda-feira, inclui os **campeões da semana**
+  de cada modo.
 
 ---
 
@@ -32,8 +33,8 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 | `/termo palavra:<5 letras>` | Registra uma tentativa da palavra do dia. Resposta privada com o grid + teclado em imagem.    |
 | `/dueto palavra:<5 letras>` | Dueto: 2 palavras ao mesmo tempo, 7 tentativas. Cada chute vale pras duas; o grid de uma palavra congela quando ela é acertada. |
 | `/quarteto palavra:<5 letras>` | Quarteto: 4 palavras ao mesmo tempo, 9 tentativas. Teclado dividido em quadrantes, um por palavra. |
-| `/termo-ranking [periodo]`  | Ranking em imagem (vitórias e média). `periodo`: semana (seg–dom), mês ou geral (padrão). Streaks são sempre do histórico todo. |
-| `/termo-stats [usuario]`    | Estatísticas pessoais (suas ou de outra pessoa): jogos, % vitórias, média, streak atual e máximo, distribuição de tentativas. |
+| `/termo-ranking [modo] [periodo]` | Ranking em imagem (vitórias e média) de um modo (padrão Termo). `periodo`: semana (seg–dom), mês ou geral (padrão). Streaks são sempre do histórico todo. |
+| `/termo-stats [usuario]`    | Estatísticas pessoais (suas ou de outra pessoa) dos 3 modos numa mensagem: jogos, % vitórias, média, streaks e distribuição de tentativas. |
 
 ### Admin (restrito por `ADMIN_USER_IDS` no `.env`)
 

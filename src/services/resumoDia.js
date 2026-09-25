@@ -1,13 +1,20 @@
 // Lógica pura do anúncio diário (sem banco/Discord) — testada em resumoDia.test.js
 import { MAX_TENTATIVAS } from './termoEngine.js';
+import { maxTentativas } from './modos.js';
 
 const LARGURA_BARRA = 10;
 const MAX_NOMES = 5;
+const LIMITE_MENSAGEM = 1900; // Discord aceita 2000 caracteres por mensagem
 
-// partidas: [{ usuario_id, venceu, num_tentativas }] — só as finalizadas do dia
-export function resumirPartidas(partidas) {
+// Faixa do histograma de um modo: com N palavras, dá pra vencer entre N e N+5 tentativas.
+export function faixaDeTentativas(numPalavras) {
+  return { min: numPalavras, max: maxTentativas(numPalavras) };
+}
+
+// partidas: [{ usuario_id, venceu, num_tentativas }] — só as finalizadas
+export function resumirPartidas(partidas, { min = 1, max = MAX_TENTATIVAS } = {}) {
   const distribuicao = {};
-  for (let i = 1; i <= MAX_TENTATIVAS; i++) distribuicao[i] = 0;
+  for (let i = min; i <= max; i++) distribuicao[i] = 0;
   distribuicao.X = 0;
 
   for (const p of partidas) {
@@ -56,32 +63,35 @@ export function calcularCampeoes(linhas) {
   return { ids, vitorias: maxVitorias, media: melhorMedia };
 }
 
-export function montarAnuncio(palavraOntem, resumo, campeoes = null) {
-  const linhas = [
-    '**🟩 Novo Termo disponível!** Use `/termo` pra jogar.',
-    '',
-    `**A palavra de ontem era \`${palavraOntem}\`**`,
-  ];
+// secoes: [{ nome, palavras, resumo }] — uma por modo, na ordem de exibição
+// campeoesPorModo: [{ nome, campeoes }] — só na segunda-feira (campeoes pode ser null)
+export function montarAnuncio(secoes, campeoesPorModo = [], { comHistograma = true } = {}) {
+  const linhas = ['**🟩 Novo dia de Termo!** Use `/termo`, `/dueto` ou `/quarteto` pra jogar.'];
 
-  const { jogaram, acertaram, melhor, maisRapidos, distribuicao } = resumo;
-  if (jogaram === 0) {
-    linhas.push('Ninguém jogou ontem.');
-  } else {
-    linhas.push(...linhasResumo(jogaram, acertaram, melhor, maisRapidos, distribuicao));
+  for (const { nome, palavras, resumo } of secoes) {
+    const rotulo = palavras.length === 1 ? 'palavra de ontem' : 'palavras de ontem';
+    linhas.push('', `**${nome}** · ${rotulo}: ${palavras.map((p) => `\`${p}\``).join(', ')}`);
+    if (resumo.jogaram === 0) linhas.push('Ninguém jogou.');
+    else linhas.push(...linhasResumo(resumo, comHistograma));
   }
 
-  if (campeoes) {
-    const rotulo = campeoes.ids.length === 1 ? 'Campeão da semana' : 'Campeões da semana';
-    const vit = `${campeoes.vitorias} ${campeoes.vitorias === 1 ? 'vitória' : 'vitórias'}`;
-    linhas.push('', `👑 **${rotulo}:** ${listar(campeoes.ids.map((id) => `<@${id}>`))} — ${vit}, média ${campeoes.media.toFixed(2)}`);
+  const comCampeao = campeoesPorModo.filter((c) => c.campeoes);
+  if (comCampeao.length > 0) {
+    linhas.push('', '👑 **Campeões da semana**');
+    for (const { nome, campeoes } of comCampeao) {
+      const vit = `${campeoes.vitorias} ${campeoes.vitorias === 1 ? 'vitória' : 'vitórias'}`;
+      linhas.push(`${nome}: ${listar(campeoes.ids.map((id) => `<@${id}>`))} — ${vit}, média ${campeoes.media.toFixed(2)}`);
+    }
   }
 
-  return linhas.join('\n');
+  const texto = linhas.join('\n');
+  // Se passar do limite do Discord, manda sem os histogramas
+  if (comHistograma && texto.length > LIMITE_MENSAGEM) return montarAnuncio(secoes, campeoesPorModo, { comHistograma: false });
+  return texto;
 }
 
-function linhasResumo(jogaram, acertaram, melhor, maisRapidos, distribuicao) {
+function linhasResumo({ jogaram, acertaram, melhor, maisRapidos, distribuicao }, comHistograma) {
   const linhas = [];
-
   const pct = Math.round((acertaram / jogaram) * 100);
   linhas.push(
     `${jogaram} ${jogaram === 1 ? 'pessoa jogou' : 'pessoas jogaram'} · `
@@ -94,6 +104,6 @@ function linhasResumo(jogaram, acertaram, melhor, maisRapidos, distribuicao) {
     linhas.push(`🏆 ${rotulo}: ${mencoes} em **${melhor}** ${melhor === 1 ? 'tentativa' : 'tentativas'}`);
   }
 
-  linhas.push('```', histograma(distribuicao), '```');
+  if (comHistograma) linhas.push('```', histograma(distribuicao), '```');
   return linhas;
 }
