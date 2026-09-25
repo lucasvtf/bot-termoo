@@ -13,6 +13,15 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Postgres temporário só pros testes de ponta a ponta (apagado quando o job termina)
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,7 +29,12 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Testes unitários
+        run: npm test
+      - name: Testes de ponta a ponta (comandos + Postgres)
+        run: npm run test:e2e
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
 
   deploy:
     needs: test

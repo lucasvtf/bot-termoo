@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { garantirPalavraDoDia } from '../services/palavraDoDia.js';
 import { anunciarDiaAnterior } from '../services/anuncioDiario.js';
 import { dataDeHoje, FUSO } from '../utils/datas.js';
+import { MODOS } from '../services/modos.js';
 
 export function registerPalavraDoDia(client) {
   cron.schedule('0 0 * * *', () => rodarPalavraDoDia(client).catch((e) => console.error('[palavraDoDia]', e)), {
@@ -15,7 +16,9 @@ export function registerPalavraDoDia(client) {
 }
 
 export async function rodarPalavraDoDia(client) {
-  const dia = await garantirPalavraDoDia(dataDeHoje());
-  console.log(`[palavraDoDia] palavra do dia ${dia.data} sorteada`);
+  // Um modo por vez: o sorteio de cada um já enxerga as palavras dos anteriores (sem repetir no mesmo dia)
+  const hoje = dataDeHoje();
+  for (const modo of Object.keys(MODOS)) await garantirPalavraDoDia(hoje, modo);
+  console.log(`[palavraDoDia] palavras do dia ${hoje} sorteadas (${Object.keys(MODOS).join(', ')})`);
   await anunciarDiaAnterior(client);
 }

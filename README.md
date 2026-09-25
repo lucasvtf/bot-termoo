@@ -30,6 +30,8 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 | Comando                     | O que faz                                                                                     |
 | --------------------------- | --------------------------------------------------------------------------------------------- |
 | `/termo palavra:<5 letras>` | Registra uma tentativa da palavra do dia. Resposta privada com o grid + teclado em imagem.    |
+| `/dueto palavra:<5 letras>` | Dueto: 2 palavras ao mesmo tempo, 7 tentativas. Cada chute vale pras duas; o grid de uma palavra congela quando ela é acertada. |
+| `/quarteto palavra:<5 letras>` | Quarteto: 4 palavras ao mesmo tempo, 9 tentativas. Teclado dividido em quadrantes, um por palavra. |
 | `/termo-ranking [periodo]`  | Ranking em imagem (vitórias e média). `periodo`: semana (seg–dom), mês ou geral (padrão). Streaks são sempre do histórico todo. |
 | `/termo-stats [usuario]`    | Estatísticas pessoais (suas ou de outra pessoa): jogos, % vitórias, média, streak atual e máximo, distribuição de tentativas. |
 
@@ -37,7 +39,7 @@ Bot pra jogar **Termo** (o Wordle em português) direto no Discord, com
 
 | Comando                                           | O que faz                                                                                                                                        |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/admin-termo rerolar`                            | Sorteia uma nova palavra do dia. Recusa se alguém já **começou** a de hoje (pra ninguém perder progresso).                                       |
+| `/admin-termo rerolar [modo]`                     | Sorteia novas palavras do dia do modo (padrão Termo). Recusa se alguém já **começou** esse modo hoje.                                              |
 | `/admin-termo definir-palavra palavra:<5 letras>` | Define manualmente a palavra do dia. Mesma trava do rerolar.                                                                                     |
 | `/admin-termo banir-palavra palavra:<5 letras>`   | Bane uma palavra permanentemente do sorteio. Se for a palavra de hoje e ninguém tiver começado, já sorteia outra na hora.                         |
 
@@ -94,6 +96,7 @@ e `npm run deploy` sempre que um comando for criado ou tiver opções alteradas.
 | `npm start`          | Sobe o bot.                                                |
 | `npm run deploy`     | Registra os slash commands no `DISCORD_GUILD_ID`.          |
 | `npm run db:migrate` | Aplica o schema (idempotente, pode rodar várias vezes).    |
+| `npm run test:e2e`   | Testes de ponta a ponta dos comandos contra um Postgres de teste (`TEST_DATABASE_URL`, só aceita banco local — o banco é apagado). Rodam no CI. |
 | `npm test`           | Roda os testes da lógica pura (feedback, streaks, resumo do dia, estatísticas, datas). |
 | `npm run db:reset-ranking -- --confirmar` | Apaga o histórico de partidas (mantém usuários, banidas e palavra do dia). |
 | `npm run db:reset -- --confirmar`         | Apaga tudo.                                                                |
