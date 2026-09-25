@@ -30,3 +30,19 @@ export function validarPalavra(entrada) {
   }
   return resultado;
 }
+
+// Sorteia `quantidade` palavras distintas.
+// Nunca: banidas nem as já usadas no mesmo dia em outro modo (senão um modo entrega dica do outro).
+// De preferência: nenhuma já usada antes. Se o banco de respostas esgotar, aceita repetir as antigas.
+export function sortearPalavras(quantidade, { nuncaUsar, evitar }, respostas = RESPOSTAS) {
+  const permitidas = respostas.filter((p) => !nuncaUsar.has(p));
+  const ineditas = permitidas.filter((p) => !evitar.has(p));
+  const candidatas = [...(ineditas.length >= quantidade ? ineditas : permitidas)];
+
+  // Fisher–Yates parcial: as `quantidade` primeiras posições viram a amostra
+  for (let i = 0; i < quantidade; i++) {
+    const j = i + Math.floor(Math.random() * (candidatas.length - i));
+    [candidatas[i], candidatas[j]] = [candidatas[j], candidatas[i]];
+  }
+  return candidatas.slice(0, quantidade);
+}

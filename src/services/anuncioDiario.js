@@ -17,8 +17,8 @@ export async function anunciarDiaAnterior(client) {
   const ontem = diaAnterior(hoje);
   const { rows } = await pool.query(
     `UPDATE termo_dias SET anunciado = TRUE
-      WHERE data = $1 AND NOT anunciado
-      RETURNING id, palavra`,
+      WHERE data = $1 AND modo = 'termo' AND NOT anunciado
+      RETURNING id, palavras`,
     [ontem],
   );
   if (rows.length === 0) return; // já anunciado, ou não existe dia de ontem
@@ -33,7 +33,7 @@ export async function anunciarDiaAnterior(client) {
     );
     // Segunda-feira: ontem foi domingo, fecha a semana (seg–dom) e anuncia o campeão
     const campeoes = inicioDaSemana(hoje) === hoje ? await campeoesDaSemana(inicioDaSemana(ontem), ontem) : null;
-    const content = montarAnuncio(dia.palavra, resumirPartidas(partidas), campeoes);
+    const content = montarAnuncio(dia.palavras.join(', '), resumirPartidas(partidas), campeoes);
     await canal.send({ content, allowedMentions: { parse: [] } });
     console.log(`[anuncio] dia ${ontem} anunciado (${partidas.length} partidas)`);
   } catch (err) {
@@ -50,7 +50,7 @@ async function campeoesDaSemana(inicio, fim) {
             AVG(tp.num_tentativas) FILTER (WHERE tp.venceu) AS media
        FROM termo_partidas tp
        JOIN termo_dias td ON td.id = tp.dia_id
-      WHERE tp.finalizado AND td.data BETWEEN $1 AND $2
+      WHERE tp.finalizado AND td.modo = 'termo' AND td.data BETWEEN $1 AND $2
       GROUP BY tp.usuario_id`,
     [inicio, fim],
   );

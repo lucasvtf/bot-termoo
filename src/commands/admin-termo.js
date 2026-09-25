@@ -2,7 +2,7 @@ import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { requireAdmin } from '../utils/admin.js';
 import { validarFormato, validarPalavra } from '../services/palavras.js';
 import {
-  rerolarPalavraDoDia, definirPalavraDoDia, banirPalavra, statusDoDia, garantirPalavraDoDia,
+  rerolarPalavraDoDia, definirPalavrasDoDia, banirPalavra, statusDoDia, garantirPalavraDoDia,
 } from '../services/palavraDoDia.js';
 import { dataDeHoje } from '../utils/datas.js';
 
@@ -46,7 +46,7 @@ export async function execute(interaction) {
     const hoje = dataDeHoje();
     if (await recusarSeAlguemComecou(interaction, hoje)) return;
     const dia = await rerolarPalavraDoDia(hoje);
-    return interaction.reply({ content: `Nova palavra do dia sorteada (\`${dia.palavra}\`).`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `Nova palavra do dia sorteada (\`${dia.palavras.join(', ')}\`).`, flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'definir-palavra') {
@@ -54,8 +54,8 @@ export async function execute(interaction) {
     if (erro) return interaction.reply({ content: erro, flags: MessageFlags.Ephemeral });
     const hoje = dataDeHoje();
     if (await recusarSeAlguemComecou(interaction, hoje)) return;
-    const dia = await definirPalavraDoDia(palavra, hoje);
-    return interaction.reply({ content: `Palavra do dia definida como \`${dia.palavra}\`.`, flags: MessageFlags.Ephemeral });
+    const dia = await definirPalavrasDoDia([palavra], hoje, 'termo');
+    return interaction.reply({ content: `Palavra do dia definida como \`${dia.palavras.join(', ')}\`.`, flags: MessageFlags.Ephemeral });
   }
 
   if (sub === 'banir-palavra') {
@@ -67,12 +67,12 @@ export async function execute(interaction) {
 
     const hoje = dataDeHoje();
     const diaAtual = await garantirPalavraDoDia(hoje);
-    if (diaAtual.palavra === palavra) {
+    if (diaAtual.palavras.includes(palavra)) {
       const { iniciadas } = await statusDoDia(hoje);
       if (iniciadas === 0) {
         const novoDia = await rerolarPalavraDoDia(hoje);
         return interaction.reply({
-          content: `\`${palavra}\` banida do sorteio. Como era a palavra de hoje e ninguém tinha começado, já sorteei outra: \`${novoDia.palavra}\`.`,
+          content: `\`${palavra}\` banida do sorteio. Como era a palavra de hoje e ninguém tinha começado, já sorteei outra: \`${novoDia.palavras.join(', ')}\`.`,
           flags: MessageFlags.Ephemeral,
         });
       }

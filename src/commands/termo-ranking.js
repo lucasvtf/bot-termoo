@@ -41,7 +41,7 @@ export async function execute(interaction) {
        FROM termo_partidas tp
        JOIN termo_dias td ON td.id = tp.dia_id
        JOIN usuarios u ON u.id = tp.usuario_id
-      WHERE tp.finalizado = TRUE
+      WHERE tp.finalizado = TRUE AND td.modo = 'termo'
       ORDER BY tp.usuario_id, td.data DESC`,
   );
 

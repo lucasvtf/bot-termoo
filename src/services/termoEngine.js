@@ -1,5 +1,8 @@
 export const TAMANHO_PALAVRA = 5;
-export const MAX_TENTATIVAS = 6;
+import { maxTentativas } from './modos.js';
+
+// Limite do Termo clássico (1 palavra). Pros outros modos use maxTentativas(n) de modos.js.
+export const MAX_TENTATIVAS = maxTentativas(1);
 
 export function calcularFeedback(tentativa, palavraCerta) {
   const t = tentativa.toUpperCase();
@@ -25,4 +28,22 @@ export function calcularFeedback(tentativa, palavraCerta) {
   }
 
   return feedback;
+}
+
+// Estado de uma partida com N palavras simultâneas (N = 1 no Termo clássico).
+// resolvidaEm[i]: em qual tentativa (1-based) a palavra i foi acertada, ou null.
+export function estadoDaPartida(tentativas, palavras) {
+  const resolvidaEm = palavras.map((p) => {
+    const i = tentativas.indexOf(p);
+    return i === -1 ? null : i + 1;
+  });
+  const venceu = resolvidaEm.every((n) => n !== null);
+  const finalizado = venceu || tentativas.length >= maxTentativas(palavras.length);
+  return { resolvidaEm, venceu, finalizado };
+}
+
+// Tentativas que aparecem no grid de cada palavra: depois de acertada, o grid "congela".
+export function tentativasPorPalavra(tentativas, palavras) {
+  const { resolvidaEm } = estadoDaPartida(tentativas, palavras);
+  return palavras.map((_, i) => tentativas.slice(0, resolvidaEm[i] ?? tentativas.length));
 }

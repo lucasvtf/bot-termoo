@@ -21,7 +21,7 @@ export async function execute(interaction) {
     `SELECT td.data::text AS data, tp.venceu, tp.num_tentativas
        FROM termo_partidas tp
        JOIN termo_dias td ON td.id = tp.dia_id
-      WHERE tp.usuario_id = $1 AND tp.finalizado
+      WHERE tp.usuario_id = $1 AND tp.finalizado AND td.modo = 'termo'
       ORDER BY td.data DESC`,
     [String(alvo.id)],
   );

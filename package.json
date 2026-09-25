@@ -13,7 +13,7 @@
     "db:migrate": "node src/db/migrate.js",
     "db:reset": "node src/db/reset.js",
     "db:reset-ranking": "node src/db/reset-ranking.js",
-    "test": "node --test src/services/termoEngine.test.js src/services/streaks.test.js src/services/resumoDia.test.js src/services/estatisticas.test.js src/utils/datas.test.js"
+    "test": "node --test src/services/termoEngine.test.js src/services/streaks.test.js src/services/resumoDia.test.js src/services/estatisticas.test.js src/utils/datas.test.js src/services/palavras.test.js"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.2",

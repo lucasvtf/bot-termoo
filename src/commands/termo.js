@@ -3,7 +3,7 @@ import { pool } from '../db/pool.js';
 import { upsertUsuario } from '../db/usuarios.js';
 import { garantirPalavraDoDia } from '../services/palavraDoDia.js';
 import { dataDeHoje } from '../utils/datas.js';
-import { MAX_TENTATIVAS } from '../services/termoEngine.js';
+import { maxTentativas } from '../services/modos.js';
 import { validarPalavra } from '../services/palavras.js';
 import { renderTermoImagem } from '../services/renderTermo.js';
 
@@ -28,7 +28,9 @@ export async function execute(interaction) {
   // Apelido no servidor → nome global → @
   const nomeExibicao = interaction.member?.displayName ?? interaction.user.displayName;
   await upsertUsuario(interaction.user.id, interaction.user.username, nomeExibicao);
-  const dia = await garantirPalavraDoDia(dataDeHoje());
+  const dia = await garantirPalavraDoDia(dataDeHoje(), 'termo');
+  const [palavraCerta] = palavraCertas;
+  const MAX_TENTATIVAS = maxTentativas(palavraCertas.length);
 
   const userId = String(interaction.user.id);
 
@@ -41,17 +43,22 @@ export async function execute(interaction) {
   );
 
   const { rows } = await pool.query(
-    `UPDATE termo_partidas
-        SET tentativas     = tentativas || jsonb_build_array($3::text),
-            num_tentativas = num_tentativas + 1,
-            venceu         = ($3::text = $4::text),
-            finalizado     = ($3::text = $4::text) OR num_tentativas + 1 >= $5,
+    // Vitória = todas as palavras do dia aparecem nas tentativas (vale pra 1, 2 ou 4 palavras).
+    // As palavras vêm do próprio termo_dias, então a checagem é consistente com o banco.
+    `UPDATE termo_partidas tp
+        SET tentativas     = tp.tentativas || jsonb_build_array($3::text),
+            num_tentativas = tp.num_tentativas + 1,
+            venceu         = td.palavras <@ (ARRAY(SELECT jsonb_array_elements_text(tp.tentativas)) || $3::text),
+            finalizado     = td.palavras <@ (ARRAY(SELECT jsonb_array_elements_text(tp.tentativas)) || $3::text)
+                             OR tp.num_tentativas + 1 >= $4,
             updated_at     = now()
-      WHERE usuario_id = $1 AND dia_id = $2
-        AND NOT finalizado
-        AND NOT (tentativas ? $3::text)
-      RETURNING tentativas, num_tentativas, venceu, finalizado`,
-    [userId, dia.id, tentativa, dia.palavra, MAX_TENTATIVAS],
+       FROM termo_dias td
+      WHERE td.id = tp.dia_id
+        AND tp.usuario_id = $1 AND tp.dia_id = $2
+        AND NOT tp.finalizado
+        AND NOT (tp.tentativas ? $3::text)
+      RETURNING tp.tentativas, tp.num_tentativas, tp.venceu, tp.finalizado`,
+    [userId, dia.id, tentativa, MAX_TENTATIVAS],
   );
 
   if (rows.length === 0) {
@@ -64,11 +71,11 @@ export async function execute(interaction) {
     if (partida.finalizado) {
       const status = partida.venceu ? 'Você já venceu hoje!' : `Você já usou suas ${MAX_TENTATIVAS} tentativas hoje.`;
       if (partida.venceu) return interaction.editReply({ content: status });
-      return interaction.editReply({ content: status, files: [anexoGrid(partida.tentativas, dia.palavra)] });
+      return interaction.editReply({ content: status, files: [anexoGrid(partida.tentativas, palavraCerta)] });
     }
     return interaction.editReply({
       content: `Você já tentou \`${tentativa}\` hoje — essa não contou.`,
-      files: [anexoGrid(partida.tentativas, dia.palavra)],
+      files: [anexoGrid(partida.tentativas, palavraCerta)],
     });
   }
 
@@ -81,13 +88,13 @@ export async function execute(interaction) {
 
   let status;
   if (venceu) status = `Você acertou em ${numTentativas}/${MAX_TENTATIVAS}!`;
-  else if (finalizado) status = `Suas tentativas acabaram. A palavra era \`${dia.palavra}\`.`;
+  else if (finalizado) status = `Suas tentativas acabaram. A palavra era \`${palavraCerta}\`.`;
   else status = `Tentativa ${numTentativas} de ${MAX_TENTATIVAS}.`;
 
   if (venceu) {
     await interaction.editReply({ content: status });
   } else {
-    await interaction.editReply({ content: status, files: [anexoGrid(novasTentativas, dia.palavra)] });
+    await interaction.editReply({ content: status, files: [anexoGrid(novasTentativas, palavraCerta)] });
   }
 
   // Só o UPDATE que muda finalizado de false pra true retorna linha com finalizado = true,
